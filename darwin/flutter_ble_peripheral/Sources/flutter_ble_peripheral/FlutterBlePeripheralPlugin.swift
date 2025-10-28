@@ -14,34 +14,45 @@ import AppKit
 import CoreLocation
 
 public class FlutterBlePeripheralPlugin: NSObject, FlutterPlugin {
-    
+
     private let flutterBlePeripheralManager: FlutterBlePeripheralManager
-    
+
     private let stateChangedHandler: StateChangedHandler
-//    private let mtuChangedHandler = MtuChangedHandler()
-//    private let dataReceivedHandler = DataReceivedHandler()
-    init(stateChangedHandler: StateChangedHandler) {
+    private let mtuChangedHandler: MtuChangedHandler
+    private let dataReceivedHandler: DataReceivedHandler
+
+    init(stateChangedHandler: StateChangedHandler, mtuChangedHandler: MtuChangedHandler, dataReceivedHandler: DataReceivedHandler) {
         self.stateChangedHandler = stateChangedHandler
-        flutterBlePeripheralManager = FlutterBlePeripheralManager(stateChangedHandler: stateChangedHandler)
+        self.mtuChangedHandler = mtuChangedHandler
+        self.dataReceivedHandler = dataReceivedHandler
+        flutterBlePeripheralManager = FlutterBlePeripheralManager(
+            stateChangedHandler: stateChangedHandler,
+            dataReceivedHandler: dataReceivedHandler,
+            mtuChangedHandler: mtuChangedHandler
+        )
         super.init()
     }
-    
+
     public static func register(with registrar: FlutterPluginRegistrar) {
-        let instance = FlutterBlePeripheralPlugin(stateChangedHandler: StateChangedHandler(registrar: registrar))
-        
+        let stateChangedHandler = StateChangedHandler(registrar: registrar)
+        let mtuChangedHandler = MtuChangedHandler(registrar: registrar)
+        let dataReceivedHandler = DataReceivedHandler(registrar: registrar)
+
+        let instance = FlutterBlePeripheralPlugin(
+            stateChangedHandler: stateChangedHandler,
+            mtuChangedHandler: mtuChangedHandler,
+            dataReceivedHandler: dataReceivedHandler
+        )
+
 #if os(iOS)
         let messenger = registrar.messenger()
 #else
         let messenger = registrar.messenger
 #endif
-        
+
         // Method channel
         let methodChannel = FlutterMethodChannel(name: "dev.steenbakker.flutter_ble_peripheral/ble_state", binaryMessenger: messenger)
         registrar.addMethodCallDelegate(instance, channel: methodChannel)
-
-        // Event channels
-//        instance.mtuChangedHandler.register(with: registrar, peripheral: instance.flutterBlePeripheralManager)
-//        instance.dataReceivedHandler.register(with: registrar, peripheral: instance.flutterBlePeripheralManager)
     }
     
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -59,8 +70,8 @@ public class FlutterBlePeripheralPlugin: NSObject, FlutterPlugin {
         case "openBluetoothSettings":
             openAppSettings()
             result(nil)
-//        case "sendData":
-//            sendData(call, result)
+        case "sendData":
+            sendData(call, result)
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -78,7 +89,7 @@ public class FlutterBlePeripheralPlugin: NSObject, FlutterPlugin {
     }
     
     private func stopPeripheral(_ result: @escaping FlutterResult) {
-        flutterBlePeripheralManager.peripheralManager.stopAdvertising()
+        flutterBlePeripheralManager.stop()
         stateChangedHandler.publishPeripheralState(state: FlutterBlePeripheralState.idle)
         result(nil)
     }
@@ -101,13 +112,23 @@ public class FlutterBlePeripheralPlugin: NSObject, FlutterPlugin {
             NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/System Settings.app"))
 #endif
     }
-    
-//    private func sendData(_ call: FlutterMethodCall,
-//                          _ result: @escaping FlutterResult) {
-//
-//        if let flutterData = call.arguments as? FlutterStandardTypedData {
-//          flutterBlePeripheralManager.send(data: flutterData.data)
-//        }
-//        result(nil)
-//    }
+
+    private func sendData(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
+        guard let flutterData = call.arguments as? FlutterStandardTypedData else {
+            print("[flutter_ble_peripheral] Send data error: arguments is not FlutterStandardTypedData")
+            result(FlutterError(code: "INVALID_ARGUMENT", message: "Data must be a byte array", details: nil))
+            return
+        }
+
+        print("[flutter_ble_peripheral] Trying to send \(flutterData.data.count) bytes")
+        let success = flutterBlePeripheralManager.sendData(data: flutterData.data)
+
+        if success {
+            print("[flutter_ble_peripheral] Data sent successfully")
+            result(nil)
+        } else {
+            print("[flutter_ble_peripheral] Failed to send data")
+            result(FlutterError(code: "SEND_FAILED", message: "Failed to send data. GATT server may not be initialized or no devices connected", details: nil))
+        }
+    }
 }
