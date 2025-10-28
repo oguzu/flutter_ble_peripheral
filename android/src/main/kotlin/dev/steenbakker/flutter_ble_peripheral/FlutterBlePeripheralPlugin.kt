@@ -24,6 +24,8 @@ import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import dev.steenbakker.flutter_ble_peripheral.callbacks.PeripheralAdvertisingCallback
 import dev.steenbakker.flutter_ble_peripheral.callbacks.PeripheralAdvertisingSetCallback
+import dev.steenbakker.flutter_ble_peripheral.handlers.DataReceivedHandler
+import dev.steenbakker.flutter_ble_peripheral.handlers.MtuChangedHandler
 import dev.steenbakker.flutter_ble_peripheral.handlers.StateChangedHandler
 import dev.steenbakker.flutter_ble_peripheral.models.*
 import dev.steenbakker.flutter_ble_peripheral.models.State.*
@@ -43,6 +45,8 @@ class FlutterBlePeripheralPlugin : FlutterPlugin, MethodChannel.MethodCallHandle
 
     private var methodChannel: MethodChannel? = null
     private lateinit var stateChangedHandler: StateChangedHandler
+    private var dataReceivedHandler: DataReceivedHandler? = null
+    private var mtuChangedHandler: MtuChangedHandler? = null
 
     private var flutterBlePeripheralManager: FlutterBlePeripheralManager? = null
     private var context: Context? = null
@@ -54,7 +58,14 @@ class FlutterBlePeripheralPlugin : FlutterPlugin, MethodChannel.MethodCallHandle
 
         context = flutterPluginBinding.applicationContext
         stateChangedHandler = StateChangedHandler(flutterPluginBinding)
-        flutterBlePeripheralManager = FlutterBlePeripheralManager(flutterPluginBinding.applicationContext)
+        dataReceivedHandler = DataReceivedHandler(flutterPluginBinding)
+        mtuChangedHandler = MtuChangedHandler(flutterPluginBinding)
+        flutterBlePeripheralManager = FlutterBlePeripheralManager(
+            flutterPluginBinding.applicationContext,
+            stateChangedHandler,
+            dataReceivedHandler,
+            mtuChangedHandler
+        )
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
@@ -119,6 +130,7 @@ class FlutterBlePeripheralPlugin : FlutterPlugin, MethodChannel.MethodCallHandle
             "hasPermission" -> handleHasPermission(result)
             "openAppSettings" -> handleOpenAppSettings(result)
             "openBluetoothSettings" -> handleOpenBluetoothSettings(result)
+            "sendData" -> handleSendData(call, result)
             else -> handleNotImplemented(result)
         }
     }
@@ -379,18 +391,38 @@ class FlutterBlePeripheralPlugin : FlutterPlugin, MethodChannel.MethodCallHandle
         }
     }
 
-//    private fun sendData(call: MethodCall, result: MethodChannel.Result) {
-//        Log.i(tag, "Try send data: ${call.arguments}")
-//
-//        (call.arguments as? ByteArray)?.let { data ->
-//            flutterBlePeripheralManager!!.send(data)
-//            Log.i(tag, "Send data: $data")
-//            Handler(Looper.getMainLooper()).post { result.success(null) }
-//        } ?: Handler(Looper.getMainLooper()).post {
-//            Log.i(tag, "Send data error")
-//            result.error("122", "send data", null)
-//        }
-//    }
+    private fun handleSendData(call: MethodCall, result: MethodChannel.Result) {
+        Handler(Looper.getMainLooper()).post {
+            try {
+                val data = call.arguments as? ByteArray
+                if (data == null) {
+                    Log.e(tag, "Send data error: arguments is not ByteArray")
+                    result.error("INVALID_ARGUMENT", "Data must be a ByteArray", null)
+                    return@post
+                }
+
+                if (flutterBlePeripheralManager == null) {
+                    Log.e(tag, "Send data error: manager is null")
+                    result.error("NOT_INITIALIZED", "FlutterBlePeripheralManager is not initialized", null)
+                    return@post
+                }
+
+                Log.i(tag, "Trying to send ${data.size} bytes")
+                val success = flutterBlePeripheralManager!!.sendData(data)
+
+                if (success) {
+                    Log.i(tag, "Data sent successfully")
+                    result.success(null)
+                } else {
+                    Log.w(tag, "Failed to send data")
+                    result.error("SEND_FAILED", "Failed to send data. GATT server may not be initialized or no devices connected", null)
+                }
+            } catch (e: Exception) {
+                Log.e(tag, "Send data exception: ${e.message}")
+                result.error("EXCEPTION", "Exception while sending data: ${e.message}", null)
+            }
+        }
+    }
 
     var pendingResultForPermission: MethodChannel.Result? = null
     var pendingResultForActivity: MethodChannel.Result? = null

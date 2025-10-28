@@ -44,12 +44,14 @@ class FlutterBlePeripheral {
     'dev.steenbakker.flutter_ble_peripheral/ble_state_changed',
   );
 
+  /// Event Channel used to receive data
+  final EventChannel _dataReceivedEventChannel = const EventChannel(
+    'dev.steenbakker.flutter_ble_peripheral/ble_data_received',
+  );
+
   Stream<int>? _mtuState;
   Stream<PeripheralState>? _peripheralState;
-
-  //TODO Event Channel used to received data
-  // final EventChannel _dataReceivedEventChannel = const EventChannel(
-  //     'dev.steenbakker.flutter_ble_peripheral/ble_data_received');
+  Stream<Uint8List>? _dataReceived;
 
   /// Start advertising. Takes [AdvertiseData] as an input.
   Future<BluetoothPeripheralState> start({
@@ -192,10 +194,14 @@ class FlutterBlePeripheral {
     return _peripheralState!;
   }
 
-  // /// Returns Stream of data.
-  // ///
-  // ///
-  // Stream<Uint8List> getDataReceived() {
-  //   return _dataReceivedEventChannel.receiveBroadcastStream().cast<Uint8List>();
-  // }
+  /// Returns Stream of data received from connected centrals.
+  ///
+  /// After listening to this Stream, you'll be notified when data is written
+  /// to the RX characteristic by a connected central device.
+  Stream<Uint8List> get onDataReceived {
+    _dataReceived ??= _dataReceivedEventChannel
+        .receiveBroadcastStream()
+        .map((dynamic event) => event as Uint8List);
+    return _dataReceived!;
+  }
 }

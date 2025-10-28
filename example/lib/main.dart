@@ -26,7 +26,7 @@ class FlutterBlePeripheralExampleState
   final AdvertiseData advertiseData = AdvertiseData(
     serviceUuid: 'bf27730d-860a-4e09-889c-2d8b6a9e0fe7',
     // serviceUuids: ['ffffffff-ffff-ffff-ffff-ffffffffffff'],
-    localName: 'test',
+    localName: 'FlutterBLE',
     manufacturerId: 1234,
     manufacturerData: Uint8List.fromList([1, 2, 3, 4, 5, 6]),
   );
@@ -41,11 +41,41 @@ class FlutterBlePeripheralExampleState
       AdvertiseSetParameters();
 
   bool _isSupported = false;
+  String _lastReceivedData = 'None';
+  int _currentMtu = 23; // Default MTU
+  int _messageCounter = 0;
 
   @override
   void initState() {
     super.initState();
     initPlatformState();
+
+    // Listen to data received
+    FlutterBlePeripheral().onDataReceived.listen((data) {
+      setState(() {
+        _lastReceivedData = 'Bytes: ${data.length}, Data: ${_formatBytes(data)}';
+      });
+      if (kDebugMode) {
+        print('Received data: $data');
+      }
+    });
+
+    // Listen to MTU changes
+    FlutterBlePeripheral().onMtuChanged.listen((mtu) {
+      setState(() {
+        _currentMtu = mtu;
+      });
+      if (kDebugMode) {
+        print('MTU changed to: $mtu');
+      }
+    });
+  }
+
+  String _formatBytes(Uint8List bytes) {
+    if (bytes.length <= 20) {
+      return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+    }
+    return '${bytes.sublist(0, 20).map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}...';
   }
 
   Future<void> initPlatformState() async {
@@ -53,6 +83,42 @@ class FlutterBlePeripheralExampleState
     setState(() {
       _isSupported = isSupported;
     });
+  }
+
+  Future<void> _sendTestData() async {
+    final isConnected = await FlutterBlePeripheral().isConnected;
+    if (!isConnected) {
+      _messangerKey.currentState?.showSnackBar(
+        const SnackBar(
+          content: Text('No device connected!'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      _messageCounter++;
+      final message = 'Hello from Flutter #$_messageCounter';
+      final data = Uint8List.fromList(message.codeUnits);
+
+      await FlutterBlePeripheral().sendData(data);
+
+      _messangerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: Text('Sent: $message'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    } catch (e) {
+      _messangerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: Text('Send failed: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Future<void> _toggleAdvertise() async {
@@ -139,15 +205,37 @@ class FlutterBlePeripheralExampleState
                   );
                 },
               ),
-              // StreamBuilder(
-              //     stream: FlutterBlePeripheral().getDataReceived(),
-              //     initialData: 'None',
-              //     builder:
-              //         (BuildContext context, AsyncSnapshot<dynamic> snapshot) {
-              //       return Text('Data received: ${snapshot.data}');
-              //     },),
+              const Divider(),
+              const Text(
+                'GATT Server Info',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              Text('MTU: $_currentMtu bytes'),
               Text(
-                'Current UUIDs: ${advertiseData.serviceUuids ?? advertiseData.serviceUuid}',
+                'Data received: $_lastReceivedData',
+                style: const TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 8),
+              StreamBuilder(
+                stream: FlutterBlePeripheral().onPeripheralStateChanged,
+                initialData: PeripheralState.unknown,
+                builder:
+                    (BuildContext context, AsyncSnapshot<PeripheralState> snapshot) {
+                  final isConnected = snapshot.data == PeripheralState.connected;
+                  return MaterialButton(
+                    onPressed: isConnected ? _sendTestData : null,
+                    color: isConnected ? Colors.green : Colors.grey,
+                    child: Text(
+                      isConnected ? 'Send Test Data' : 'Not Connected',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  );
+                },
+              ),
+              const Divider(),
+              Text(
+                'Service UUID: ${advertiseData.serviceUuid}',
+                style: const TextStyle(fontSize: 12),
               ),
               MaterialButton(
                 onPressed: _toggleAdvertise,
