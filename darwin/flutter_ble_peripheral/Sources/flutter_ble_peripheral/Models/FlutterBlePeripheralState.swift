@@ -7,33 +7,32 @@
 
 import Foundation
 
-enum FlutterBlePeripheralState : Int{
-//    case idle, unauthorized, unsupported, advertising, connected
-    /// Status is not (yet) determined.
+/**
+ Represents the current state of the Flutter BLE Peripheral.
+
+ This enum mirrors the BLE state used on the Flutter side,
+ providing a unified model for cross-platform BLE peripheral state management.
+ */
+enum FlutterBlePeripheralState: Int {
+
+    /// The current BLE status is not yet determined.
     case unknown
 
     /// BLE is not supported on this device.
     case unsupported
 
-    /// BLE usage is not authorized for this app.
+    /// The app is not authorized to use BLE.
     case unauthorized
 
-    /// BLE is turned off.
+    /// Bluetooth is currently turned off.
     case poweredOff
 
-    // /// Android only: Location services are disabled.
-    // locationServicesDisabled,
-
-    /// BLE is fully operating for this app.
+    /// BLE is available and ready to use, but not currently advertising or connected.
     case idle
 
-    /// BLE is advertising data.
+    /// BLE is actively advertising data.
     case advertising
 
-    /// BLE is connected to a device.
+    /// BLE is connected to a remote device.
     case connected
-    
-//    var index: Int { PeripheralState..firstIndex(of: self) ?? 0 }
 }
-
-

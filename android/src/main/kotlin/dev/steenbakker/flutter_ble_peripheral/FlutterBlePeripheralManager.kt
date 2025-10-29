@@ -27,39 +27,72 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
+import androidx.core.content.edit
 import dev.steenbakker.flutter_ble_peripheral.callbacks.GattServerCallback
 import dev.steenbakker.flutter_ble_peripheral.callbacks.PeripheralAdvertisingCallback
 import dev.steenbakker.flutter_ble_peripheral.callbacks.PeripheralAdvertisingSetCallback
 import dev.steenbakker.flutter_ble_peripheral.handlers.DataReceivedHandler
 import dev.steenbakker.flutter_ble_peripheral.handlers.MtuChangedHandler
-import dev.steenbakker.flutter_ble_peripheral.handlers.StateChangedHandler
-import dev.steenbakker.flutter_ble_peripheral.models.State
+import dev.steenbakker.flutter_ble_peripheral.handlers.FlutterBlePeripheralStateChangedHandler
+import dev.steenbakker.flutter_ble_peripheral.models.FlutterBleBluetoothState
 import io.flutter.Log
 import java.util.UUID
 
+/**
+ * BLE Peripheral manager responsible for low-level Bluetooth LE peripheral operations.
+ *
+ * Responsibilities:
+ * - Manage BLE advertising (both legacy and advertising sets).
+ * - Handle Bluetooth adapter state and permissions.
+ * - Manage GATT server for bidirectional communication with centrals.
+ * - Coordinate with Flutter handlers for state changes, data received, and MTU changes.
+ */
 class FlutterBlePeripheralManager(
     private val context: Context,
-    private val stateChangedHandler: StateChangedHandler,
+    private val flutterBlePeripheralStateChangedHandler: FlutterBlePeripheralStateChangedHandler,
     private val dataReceivedHandler: DataReceivedHandler?,
     private val mtuChangedHandler: MtuChangedHandler?
 ) {
 
     companion object {
+        /** Request code for Bluetooth enable intent. */
         const val REQUEST_ENABLE_BT = 4
+
+        /** Request code for Bluetooth permission requests. */
         const val REQUEST_PERMISSION_BT = 8
+
+        /** Tag for logging purposes. */
         private const val TAG = "FlutterBlePeripheralMgr"
 
-        // Client Characteristic Configuration Descriptor UUID
+        /** Client Characteristic Configuration Descriptor UUID for enabling notifications/indications. */
         private val CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
     }
 
+    /** Bluetooth manager for accessing the BLE adapter. */
     var mBluetoothManager: BluetoothManager? = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+
+    /** BLE advertiser for broadcasting peripheral data. */
     var mBluetoothLeAdvertiser: BluetoothLeAdvertiser? = null
 
+    /** Callback invoked after permission request result */
+    var permissionResultCallback: ((FlutterBleBluetoothState) -> Unit)? = null
+
+    /** Callback invoked after enable bluetooth request */
+    var bluetoothEnabledCallback: ((Boolean) -> Unit)? = null
+
+    /** GATT server instance for handling connections from centrals. */
     private var mBluetoothGattServer: BluetoothGattServer? = null
+
+    /** Callback handler for GATT server events. */
     private var gattServerCallback: GattServerCallback? = null
+
+    /** TX characteristic for sending data to centrals (notify/indicate). */
     private var txCharacteristic: BluetoothGattCharacteristic? = null
+
+    /** RX characteristic for receiving data from centrals (write). */
     private var rxCharacteristic: BluetoothGattCharacteristic? = null
+
+    /** UUID of the currently active GATT service. */
     private var currentServiceUuid: String? = null
 
     // Permissions for Bluetooth API > 31
@@ -94,85 +127,16 @@ class FlutterBlePeripheralManager(
     }
 
     /**
-     * Check if bluetooth is enabled.
-     */
-    fun isBluetoothEnabled(): Boolean {
-        return mBluetoothManager?.adapter?.isEnabled ?: false
-    }
-    fun hasPermission(activity: Activity): State {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (!hasBluetoothAdvertisePermission(activity) || !hasBluetoothConnectPermission(activity)) {
-                if (ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.BLUETOOTH_ADVERTISE) ||
-                    ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.BLUETOOTH_CONNECT)) {
-                    return State.Denied
-                }
-                return State.PermanentlyDenied
-            }
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            if (!hasLocationCoarsePermission(activity) || !hasLocationFinePermission(activity)) {
-                if (ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.ACCESS_FINE_LOCATION) ||
-                    ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.ACCESS_COARSE_LOCATION)) {
-                    return State.Denied
-                }
-                return State.PermanentlyDenied
-            }
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (!hasLocationCoarsePermission(activity)) {
-                if (ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.ACCESS_COARSE_LOCATION)) {
-                    return State.Denied
-                }
-                return State.PermanentlyDenied
-            }
-        }
-        return State.Granted
-    }
-
-    fun requestPermission(activity: Activity) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            ActivityCompat.requestPermissions(
-                activity,
-                arrayOf(
-                    Manifest.permission.BLUETOOTH_CONNECT,
-                    Manifest.permission.BLUETOOTH_ADVERTISE
-                ),
-                REQUEST_PERMISSION_BT
-            )
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            ActivityCompat.requestPermissions(
-                activity,
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                ),
-                REQUEST_PERMISSION_BT
-            )
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            ActivityCompat.requestPermissions(
-                activity,
-                arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION),
-                REQUEST_PERMISSION_BT
-            )
-        }
-    }
-
-    fun enableBluetoothWithDialog(activity: Activity) {
-        ActivityCompat.startActivityForResult(
-            activity,
-            Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE),
-            REQUEST_ENABLE_BT,
-            null
-        )
-    }
-
-    fun enableBluetoothDirectly() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            @Suppress("DEPRECATION")
-            mBluetoothManager!!.adapter.enable()
-        }
-    }
-
-    /**
-     * Start advertising using the startAdvertising() method.
+     * Start BLE advertising using the legacy advertising API.
+     *
+     * Optionally creates a GATT server with TX/RX characteristics for bidirectional communication.
+     *
+     * @param peripheralData The advertise data to broadcast
+     * @param peripheralSettings The advertise settings (mode, power, timeout, etc.)
+     * @param peripheralResponse Optional scan response data
+     * @param mAdvertiseCallback Callback for advertising events
+     * @param serviceUuid Optional service UUID for GATT server
+     * @param addGattService If true and serviceUuid is provided, creates a GATT server
      */
     fun start(
         peripheralData: AdvertiseData,
@@ -199,7 +163,21 @@ class FlutterBlePeripheralManager(
     }
 
     /**
-     * Start advertising using the startAdvertisingSet method.
+     * Start BLE advertising using the Advertising Set API (Android O+).
+     *
+     * Supports extended advertising features like multiple PHYs and periodic advertising.
+     * Optionally creates a GATT server with TX/RX characteristics for bidirectional communication.
+     *
+     * @param advertiseData The advertise data to broadcast
+     * @param advertiseSettingsSet The advertising set parameters
+     * @param peripheralResponse Optional scan response data
+     * @param periodicResponse Optional periodic advertising data
+     * @param periodicResponseSettings Optional periodic advertising parameters
+     * @param maxExtendedAdvertisingEvents Maximum number of extended advertising events (0 = no limit)
+     * @param duration Duration in 10ms units (0 = no time limit)
+     * @param mAdvertiseSetCallback Callback for advertising set events
+     * @param serviceUuid Optional service UUID for GATT server
+     * @param addGattService If true and serviceUuid is provided, creates a GATT server
      */
     @RequiresApi(Build.VERSION_CODES.O)
     fun startSet(
@@ -234,11 +212,21 @@ class FlutterBlePeripheralManager(
         }
     }
 
+    /**
+     * Stop legacy BLE advertising and close GATT server.
+     *
+     * @param advertisingCallback The callback used when starting advertising
+     */
     fun stop(advertisingCallback: AdvertiseCallback) {
         mBluetoothLeAdvertiser!!.stopAdvertising(advertisingCallback)
         closeGattServer()
     }
 
+    /**
+     * Stop advertising set (Android O+) and close GATT server.
+     *
+     * @param advertisingSetCallback The callback used when starting the advertising set
+     */
     @RequiresApi(Build.VERSION_CODES.O)
     fun stopSet(advertisingSetCallback: AdvertisingSetCallback) {
         mBluetoothLeAdvertiser!!.stopAdvertisingSet(advertisingSetCallback)
@@ -260,7 +248,7 @@ class FlutterBlePeripheralManager(
             // Create callback if not exists
             if (gattServerCallback == null) {
                 gattServerCallback = GattServerCallback(
-                    stateChangedHandler,
+                    flutterBlePeripheralStateChangedHandler,
                     dataReceivedHandler,
                     mtuChangedHandler,
                     rxCharacteristicUuid
@@ -409,5 +397,224 @@ class FlutterBlePeripheralManager(
      */
     fun hasConnectedDevices(): Boolean {
         return gattServerCallback?.hasConnectedDevices() ?: false
+    }
+
+    /**
+     * Checks whether Bluetooth is currently enabled.
+     *
+     * @return `true` if enabled, `false` otherwise
+     */
+    fun isBluetoothEnabled(): Boolean {
+        return mBluetoothManager?.adapter?.isEnabled ?: false
+    }
+
+    /**
+     * Attempts to enable Bluetooth on the device.
+     *
+     * If [callback] is not null, shows the system dialog to request user approval.
+     * If [callback] is null and the Android version is below Tiramisu, enables Bluetooth programmatically.
+     *
+     * @param activity Activity to use for launching the enable dialog
+     * @param callback Response on intent to enable bluetooth (pre-Android 13)
+     */
+    fun enableBluetooth(activity: Activity, callback: ((Boolean) -> Unit)?) {
+        if (callback != null) {
+            bluetoothEnabledCallback = callback
+            ActivityCompat.startActivityForResult(
+                activity,
+                Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE),
+                REQUEST_ENABLE_BT,
+                null
+            )
+        } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            @Suppress("DEPRECATION")
+            mBluetoothManager!!.adapter.enable()
+        }
+    }
+
+    /**
+     * Returns a list of missing permissions depending on the Android version.
+     *
+     * @param activity The activity to check permissions against
+     * @return List of permission strings that are not currently granted
+     */
+    fun getMissingPermissions(activity: Activity): List<String> {
+        val missingPermissions = mutableListOf<String>()
+
+        when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+                if (!hasBluetoothAdvertisePermission(activity)) {
+                    missingPermissions.add(Manifest.permission.BLUETOOTH_ADVERTISE)
+                }
+                if (!hasBluetoothConnectPermission(activity)) {
+                    missingPermissions.add(Manifest.permission.BLUETOOTH_CONNECT)
+                }
+            }
+
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.P -> {
+                if (!hasLocationFinePermission(activity)) {
+                    missingPermissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
+                }
+                if (!hasLocationCoarsePermission(activity)) {
+                    missingPermissions.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+                }
+            }
+
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.M -> {
+                if (!hasLocationCoarsePermission(activity)) {
+                    missingPermissions.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+                }
+            }
+        }
+
+        return missingPermissions
+    }
+
+    /**
+     * Checks and optionally requests missing Bluetooth-related permissions.
+     *
+     * @param activity The activity to request permissions from
+     * @param callback Optional callback for async permission result.
+     * If `null`, the method just returns the current [FlutterBleBluetoothState].
+     *
+     * @return Current [FlutterBleBluetoothState] if no request is needed, or `null` if a request was initiated.
+     */
+    fun requestPermission(activity: Activity, callback: ((FlutterBleBluetoothState) -> Unit)?): FlutterBleBluetoothState? {
+        val missingPermissions = getMissingPermissions(activity)
+
+        // No missing permissions
+        if (missingPermissions.isEmpty()) {
+            setPermissionGranted(activity, true)
+            return FlutterBleBluetoothState.Granted
+        }
+
+        val previouslyRequested = getPermissionRequested(activity)
+        val previouslyGranted = getPermissionGranted(activity)
+
+        val shouldShowRationale = missingPermissions.any { permission ->
+            ActivityCompat.shouldShowRequestPermissionRationale(activity, permission)
+        }
+
+        val isRevoked = previouslyGranted && missingPermissions.isNotEmpty()
+
+        // Just checking status
+        if (callback == null) {
+            return when {
+                isRevoked -> FlutterBleBluetoothState.Denied
+                shouldShowRationale -> FlutterBleBluetoothState.Denied
+                !previouslyRequested -> FlutterBleBluetoothState.Denied
+                else -> FlutterBleBluetoothState.PermanentlyDenied
+            }
+        }
+
+        // Request permission
+        permissionResultCallback = callback
+        setPermissionRequested(activity, true)
+        ActivityCompat.requestPermissions(
+            activity,
+            missingPermissions.toTypedArray(),
+            REQUEST_PERMISSION_BT
+        )
+
+        return null
+    }
+
+    /**
+     * Returns the current Bluetooth adapter state as a [FlutterBleBluetoothState] enum.
+     *
+     * @return [FlutterBleBluetoothState.Unsupported] if adapter is null,
+     * [FlutterBleBluetoothState.Denied] if disabled, [FlutterBleBluetoothState.Ready] if enabled.
+     */
+    fun getBluetoothState(): FlutterBleBluetoothState {
+        val adapter = mBluetoothManager?.adapter
+        return if (adapter == null) FlutterBleBluetoothState.Unsupported
+        else if (!adapter.isEnabled) FlutterBleBluetoothState.Denied
+        else FlutterBleBluetoothState.Ready
+    }
+
+    /**
+     * Ensures Bluetooth is ready before performing BLE operations.
+     *
+     * - Checks adapter support
+     * - Requests permissions if needed
+     * - Enables Bluetooth if disabled
+     *
+     * @param activity The activity context
+     * @param onReady Callback executed if Bluetooth is ready
+     * @param onError Callback executed with the error [FlutterBleBluetoothState]
+     */
+    fun ensureBluetoothReady(
+        activity: Activity,
+        onReady: () -> Unit,
+        onError: (FlutterBleBluetoothState) -> Unit
+    ) {
+        if (getBluetoothState() == FlutterBleBluetoothState.Unsupported) {
+            onError(FlutterBleBluetoothState.Unsupported)
+            return
+        }
+
+        val permissionState = requestPermission(activity) { permState ->
+            if (permState == FlutterBleBluetoothState.Granted) {
+                if (!isBluetoothEnabled()) {
+                    enableBluetooth(activity) { bluetoothEnabled ->
+                        if (bluetoothEnabled) {
+                            onReady()
+                        } else {
+                            onError(FlutterBleBluetoothState.TurnedOff)
+                        }
+                    }
+                } else {
+                    onReady()
+                }
+            } else {
+                onError(permState)
+            }
+        }
+
+        if (permissionState == FlutterBleBluetoothState.Granted) {
+            if (!isBluetoothEnabled()) {
+                enableBluetooth(activity) { bluetoothEnabled ->
+                    if (bluetoothEnabled) {
+                        onReady()
+                    } else {
+                        onError(FlutterBleBluetoothState.TurnedOff)
+                    }
+                }
+            } else {
+                onReady()
+            }
+        }
+    }
+
+    /**
+     * Persist the permission granted flag in SharedPreferences.
+     */
+    fun setPermissionGranted(context: Context, granted: Boolean) {
+        val prefs = context.getSharedPreferences("flutter_ble_central", Context.MODE_PRIVATE)
+        prefs.edit { putBoolean("permission_granted", granted) }
+    }
+
+    /**
+     * Persist the permission requested flag in SharedPreferences.
+     */
+    fun setPermissionRequested(context: Context, granted: Boolean) {
+        val prefs = context.getSharedPreferences("flutter_ble_central", Context.MODE_PRIVATE)
+        prefs.edit { putBoolean("permission_requested", granted) }
+    }
+
+    /**
+     * Returns whether permission has been granted previously.
+     */
+    fun getPermissionGranted(context: Context): Boolean {
+        val prefs = context.getSharedPreferences("flutter_ble_central", Context.MODE_PRIVATE)
+        return prefs.getBoolean("permission_granted", false)
+    }
+
+    /**
+     * Returns whether permission has been requested previously.
+     */
+    fun getPermissionRequested(context: Context): Boolean {
+        val prefs = context.getSharedPreferences("flutter_ble_central", Context.MODE_PRIVATE)
+        return prefs.getBoolean("permission_requested", false)
     }
 }

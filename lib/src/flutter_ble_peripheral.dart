@@ -11,10 +11,10 @@ import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_ble_peripheral/src/models/advertise_data.dart';
-import 'package:flutter_ble_peripheral/src/models/advertise_set_parameters.dart';
-import 'package:flutter_ble_peripheral/src/models/advertise_settings.dart';
+import 'package:flutter_ble_peripheral/src/platform/android/models/advertise_set_parameters.dart';
+import 'package:flutter_ble_peripheral/src/platform/android/models/advertise_settings.dart';
 import 'package:flutter_ble_peripheral/src/models/enums/bluetooth_peripheral_state.dart';
-import 'package:flutter_ble_peripheral/src/models/periodic_advertise_settings.dart';
+import 'package:flutter_ble_peripheral/src/platform/android/models/periodic_advertise_settings.dart';
 import 'package:flutter_ble_peripheral/src/models/peripheral_state.dart';
 
 class FlutterBlePeripheral {

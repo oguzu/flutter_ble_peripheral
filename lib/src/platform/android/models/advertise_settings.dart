@@ -1,5 +1,5 @@
-import 'package:flutter_ble_peripheral/src/models/enums/advertise_mode.dart';
-import 'package:flutter_ble_peripheral/src/models/enums/advertise_tx_power.dart';
+import 'package:flutter_ble_peripheral/src/platform/android/enums/advertise_mode.dart';
+import 'package:flutter_ble_peripheral/src/platform/android/models/advertise_tx_power.dart';
 import 'package:json_annotation/json_annotation.dart';
 
 part 'advertise_settings.g.dart';

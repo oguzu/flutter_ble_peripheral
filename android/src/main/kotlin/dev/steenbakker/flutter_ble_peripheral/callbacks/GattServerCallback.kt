@@ -16,12 +16,12 @@ import android.os.Handler
 import android.os.Looper
 import dev.steenbakker.flutter_ble_peripheral.handlers.DataReceivedHandler
 import dev.steenbakker.flutter_ble_peripheral.handlers.MtuChangedHandler
-import dev.steenbakker.flutter_ble_peripheral.handlers.StateChangedHandler
-import dev.steenbakker.flutter_ble_peripheral.models.PeripheralState
+import dev.steenbakker.flutter_ble_peripheral.handlers.FlutterBlePeripheralStateChangedHandler
+import dev.steenbakker.flutter_ble_peripheral.models.FlutterBlePeripheralState
 import io.flutter.Log
 
 class GattServerCallback(
-    private val stateChangedHandler: StateChangedHandler,
+    private val flutterBlePeripheralStateChangedHandler: FlutterBlePeripheralStateChangedHandler,
     private val dataReceivedHandler: DataReceivedHandler?,
     private val mtuChangedHandler: MtuChangedHandler?,
     private val rxCharacteristicUuid: String?
@@ -38,13 +38,13 @@ class GattServerCallback(
                 BluetoothProfile.STATE_CONNECTED -> {
                     Log.i(tag, "Device connected: ${device.address}")
                     connectedDevices.add(device)
-                    stateChangedHandler.publishPeripheralState(PeripheralState.connected)
+                    flutterBlePeripheralStateChangedHandler.publish(FlutterBlePeripheralState.connected)
                 }
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     Log.i(tag, "Device disconnected: ${device.address}")
                     connectedDevices.remove(device)
                     if (connectedDevices.isEmpty()) {
-                        stateChangedHandler.publishPeripheralState(PeripheralState.advertising)
+                        flutterBlePeripheralStateChangedHandler.publish(FlutterBlePeripheralState.advertising)
                     }
                 }
             }
@@ -87,7 +87,7 @@ class GattServerCallback(
                     Log.i(tag, "Received data: ${data.size} bytes")
                     // Publish received data to Flutter
                     Handler(Looper.getMainLooper()).post {
-                        dataReceivedHandler?.publishData(data)
+                        dataReceivedHandler?.publish(data)
                     }
                 }
             }
@@ -97,7 +97,7 @@ class GattServerCallback(
                 if (data.isNotEmpty()) {
                     Log.i(tag, "Received data: ${data.size} bytes")
                     Handler(Looper.getMainLooper()).post {
-                        dataReceivedHandler?.publishData(data)
+                        dataReceivedHandler?.publish(data)
                     }
                 }
             }
@@ -161,7 +161,7 @@ class GattServerCallback(
         Log.i(tag, "MTU changed to $mtu for device ${device?.address}")
 
         Handler(Looper.getMainLooper()).post {
-            mtuChangedHandler?.publishMtu(mtu)
+            mtuChangedHandler?.publish(mtu)
         }
     }
 

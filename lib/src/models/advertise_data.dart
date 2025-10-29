@@ -6,7 +6,7 @@
 
 import 'dart:typed_data';
 
-import 'package:flutter_ble_peripheral/src/models/uint8list_converter.dart';
+import 'package:flutter_ble_peripheral/src/core/utils/uint8list_converter.dart';
 import 'package:json_annotation/json_annotation.dart';
 
 part 'advertise_data.g.dart';
