@@ -248,10 +248,10 @@ class FlutterBlePeripheralExampleState
   //   }
   // }
 
-  Future<void> _requestPermissions([BluetoothPeripheralState? state]) async {
+  Future<void> _requestPermissions([FlutterBleBluetoothState? state]) async {
     final hasPermission = await FlutterBlePeripheral().requestPermission();
     switch (hasPermission) {
-      case BluetoothPeripheralState.denied:
+      case FlutterBleBluetoothState.denied:
         _messangerKey.currentState?.showSnackBar(
           const SnackBar(
             backgroundColor: Colors.red,
@@ -281,7 +281,7 @@ class FlutterBlePeripheralExampleState
     _messangerKey.currentState?.showSnackBar(
       SnackBar(
         content: Text('Has permission: $hasPermissions'),
-        backgroundColor: hasPermissions == BluetoothPeripheralState.granted
+        backgroundColor: hasPermissions == FlutterBleBluetoothState.granted
             ? Colors.green
             : Colors.red,
       ),
@@ -324,15 +324,15 @@ class FlutterBlePeripheralExampleState
                       Text('BLE Supported: $_isSupported'),
                       StreamBuilder(
                         stream: FlutterBlePeripheral().onPeripheralStateChanged,
-                        initialData: PeripheralState.unknown,
+                        initialData: FlutterBlePeripheralState.unknown,
                         builder:
                             (BuildContext context, AsyncSnapshot<dynamic> snapshot) {
-                          final state = (snapshot.data as PeripheralState).name;
+                          final state = (snapshot.data as FlutterBlePeripheralState).name;
                           return Text(
                             'Connection State: $state',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: snapshot.data == PeripheralState.connected
+                              color: snapshot.data == FlutterBlePeripheralState.connected
                                   ? Colors.green
                                   : Colors.orange,
                             ),
@@ -390,10 +390,10 @@ class FlutterBlePeripheralExampleState
               const SizedBox(height: 16),
               StreamBuilder(
                 stream: FlutterBlePeripheral().onPeripheralStateChanged,
-                initialData: PeripheralState.unknown,
+                initialData: FlutterBlePeripheralState.unknown,
                 builder:
-                    (BuildContext context, AsyncSnapshot<PeripheralState> snapshot) {
-                  final isConnected = snapshot.data == PeripheralState.connected;
+                    (BuildContext context, AsyncSnapshot<FlutterBlePeripheralState> snapshot) {
+                  final isConnected = snapshot.data == FlutterBlePeripheralState.connected;
                   return ElevatedButton.icon(
                     onPressed: isConnected ? _sendTestData : null,
                     icon: const Icon(Icons.send),

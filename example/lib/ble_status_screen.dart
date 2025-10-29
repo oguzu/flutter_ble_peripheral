@@ -4,19 +4,19 @@ import 'package:flutter_ble_peripheral/flutter_ble_peripheral.dart';
 class BleStatusScreen extends StatelessWidget {
   const BleStatusScreen({required this.status, super.key});
 
-  final PeripheralState status;
+  final FlutterBlePeripheralState status;
   // idle, advertising, connected, unsupported, unauthorized }
-  String determineText(PeripheralState status) {
+  String determineText(FlutterBlePeripheralState status) {
     switch (status) {
-      case PeripheralState.unsupported:
+      case FlutterBlePeripheralState.unsupported:
         return "This device does not support Bluetooth";
-      case PeripheralState.unauthorized:
+      case FlutterBlePeripheralState.unauthorized:
         return "Authorize the BlePeripheral example app to use Bluetooth and location";
-      case PeripheralState.poweredOff:
+      case FlutterBlePeripheralState.poweredOff:
         return "Bluetooth is powered off on your device turn it on";
       // case PeripheralState.unauthorized:
       //   return "Enable location services";
-      case PeripheralState.idle:
+      case FlutterBlePeripheralState.idle:
         return "Bluetooth is up and running";
       default:
         return "Waiting to fetch Bluetooth status $status";

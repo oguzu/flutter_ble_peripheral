@@ -10,12 +10,12 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
-import 'package:flutter_ble_peripheral/src/models/advertise_data.dart';
+import 'package:flutter_ble_peripheral/src/core/models/advertise_data.dart';
 import 'package:flutter_ble_peripheral/src/platform/android/models/advertise_set_parameters.dart';
 import 'package:flutter_ble_peripheral/src/platform/android/models/advertise_settings.dart';
-import 'package:flutter_ble_peripheral/src/models/enums/bluetooth_peripheral_state.dart';
+import 'package:flutter_ble_peripheral/src/core/enums/flutter_ble_bluetooth_state.dart';
 import 'package:flutter_ble_peripheral/src/platform/android/models/periodic_advertise_settings.dart';
-import 'package:flutter_ble_peripheral/src/models/peripheral_state.dart';
+import 'package:flutter_ble_peripheral/src/platform/android/enums/flutter_ble_peripheral_state.dart';
 
 class FlutterBlePeripheral {
   /// Singleton instance
@@ -50,11 +50,11 @@ class FlutterBlePeripheral {
   );
 
   Stream<int>? _mtuState;
-  Stream<PeripheralState>? _peripheralState;
+  Stream<FlutterBlePeripheralState>? _peripheralState;
   Stream<Uint8List>? _dataReceived;
 
   /// Start advertising. Takes [AdvertiseData] as an input.
-  Future<BluetoothPeripheralState> start({
+  Future<FlutterBleBluetoothState> start({
     required AdvertiseData advertiseData,
     AdvertiseSettings? advertiseSettings,
     AdvertiseSetParameters? advertiseSetParameters,
@@ -105,16 +105,16 @@ class FlutterBlePeripheral {
     final response =
         await _methodChannel.invokeMethod<int>('start', parameters);
     return response == null
-        ? BluetoothPeripheralState.unknown
-        : BluetoothPeripheralState.values[response];
+        ? FlutterBleBluetoothState.unknown
+        : FlutterBleBluetoothState.values[response];
   }
 
   /// Stop advertising
-  Future<BluetoothPeripheralState> stop() async {
+  Future<FlutterBleBluetoothState> stop() async {
     final response = await _methodChannel.invokeMethod<int>('stop');
     return response == null
-        ? BluetoothPeripheralState.unknown
-        : BluetoothPeripheralState.values[response];
+        ? FlutterBleBluetoothState.unknown
+        : FlutterBleBluetoothState.values[response];
   }
 
   /// Returns `true` if advertising or false if not advertising
@@ -148,21 +148,19 @@ class FlutterBlePeripheral {
         false;
   }
 
-  Future<BluetoothPeripheralState> requestPermission() async {
-    if (!Platform.isAndroid) return BluetoothPeripheralState.unknown;
+  Future<FlutterBleBluetoothState> requestPermission() async {
     final response =
         await _methodChannel.invokeMethod<int>('requestPermission');
     return response == null
-        ? BluetoothPeripheralState.unknown
-        : BluetoothPeripheralState.values[response];
+        ? FlutterBleBluetoothState.unknown
+        : FlutterBleBluetoothState.values[response];
   }
 
-  Future<BluetoothPeripheralState> hasPermission() async {
-    if (!Platform.isAndroid) return BluetoothPeripheralState.unknown;
+  Future<FlutterBleBluetoothState> hasPermission() async {
     final response = await _methodChannel.invokeMethod<int>('hasPermission');
     return response == null
-        ? BluetoothPeripheralState.unknown
-        : BluetoothPeripheralState.values[response];
+        ? FlutterBleBluetoothState.unknown
+        : FlutterBleBluetoothState.values[response];
   }
 
   Future<void> openBluetoothSettings() async {
@@ -186,11 +184,11 @@ class FlutterBlePeripheral {
   /// Returns Stream of state.
   ///
   /// After listening to this Stream, you'll be notified about changes in peripheral state.
-  Stream<PeripheralState>? get onPeripheralStateChanged {
+  Stream<FlutterBlePeripheralState>? get onPeripheralStateChanged {
     if (Platform.isWindows) return null;
     _peripheralState ??= _stateChangedEventChannel
         .receiveBroadcastStream()
-        .map((dynamic event) => PeripheralState.values[event as int]);
+        .map((dynamic event) => FlutterBlePeripheralState.values[event as int]);
     return _peripheralState!;
   }
 

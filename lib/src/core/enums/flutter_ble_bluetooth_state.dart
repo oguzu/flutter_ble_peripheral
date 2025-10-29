@@ -6,7 +6,7 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
-enum BluetoothPeripheralState {
+enum FlutterBleBluetoothState {
   /// The user granted access to the requested feature.
   @JsonValue(0)
   granted,

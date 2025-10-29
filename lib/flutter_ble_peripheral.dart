@@ -1,10 +1,9 @@
 export 'src/flutter_ble_peripheral.dart';
-export 'src/models/advertise_data.dart';
+export 'src/core/models/advertise_data.dart';
 export 'src/platform/android/models/advertise_set_parameters.dart';
 export 'src/platform/android/models/advertise_settings.dart';
 export 'src/platform/android/models/constants.dart';
 export 'src/platform/android/enums/advertise_mode.dart';
 export 'src/platform/android/models/advertise_tx_power.dart';
-export 'src/models/enums/bluetooth_peripheral_state.dart';
-export 'src/models/peripheral_state.dart';
-export 'src/models/permission_state.dart';
+export 'src/core/enums/flutter_ble_bluetooth_state.dart';
+export 'src/platform/android/enums/flutter_ble_peripheral_state.dart';
