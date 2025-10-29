@@ -197,7 +197,7 @@ class FlutterBlePeripheralPlugin :
             val advertiseSettingsSet: AdvertisingSetParameters.Builder = AdvertisingSetParameters.Builder()
             (arguments["setanonymous"] as Boolean?)?.let { advertiseSettingsSet.setAnonymous(it) }
             (arguments["setconnectable"] as Boolean?)?.let { advertiseSettingsSet.setConnectable(it) }
-            (arguments["setsetIncludeTxPower"] as Boolean?)?.let { advertiseSettingsSet.setIncludeTxPower(it) }
+            (arguments["settransmissionPowerIncluded"] as Boolean?)?.let { advertiseSettingsSet.setIncludeTxPower(it) }
             (arguments["setinterval"] as Int?)?.let { advertiseSettingsSet.setInterval(it) }
             (arguments["setlegacyMode"] as Boolean?)?.let { advertiseSettingsSet.setLegacyMode(it) }
             (arguments["setprimaryPhy"] as Int?)?.let { advertiseSettingsSet.setPrimaryPhy(it) }

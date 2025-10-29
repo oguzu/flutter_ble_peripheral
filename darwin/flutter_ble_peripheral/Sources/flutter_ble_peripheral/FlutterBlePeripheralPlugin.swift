@@ -145,16 +145,71 @@ public class FlutterBlePeripheralPlugin: NSObject, FlutterPlugin {
     private func startPeripheral(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
         // Check combined state (permissions + Bluetooth adapter state)
         let state = flutterBlePeripheralManager.getCombinedState()
-        
+
         // Only start peripheral if Bluetooth is ready
         if state == .Ready || state == .Granted {
             let map = call.arguments as? [String: Any]
+
+            // Parse core advertising data
             let advertiseData = FlutterBlePeripheralData(
                 uuid: map?["serviceUuid"] as? String,
                 localName: map?["localName"] as? String,
                 uuids: map?["serviceUuids"] as? [String]
             )
-            flutterBlePeripheralManager.start(advertiseData: advertiseData)
+
+            // Build advertisement data dictionary
+            var advertisementData: [String: Any] = [:]
+
+            // Add service UUIDs
+            if let uuids = advertiseData.uuids {
+                advertisementData[CBAdvertisementDataServiceUUIDsKey] = uuids.map { CBUUID(string: $0) }
+            } else if let uuid = advertiseData.uuid {
+                advertisementData[CBAdvertisementDataServiceUUIDsKey] = [CBUUID(string: uuid)]
+            }
+
+            // Add local name
+            if let localName = advertiseData.localName {
+                advertisementData[CBAdvertisementDataLocalNameKey] = localName
+            }
+
+            // Parse Darwin-specific settings (prefixed with "darwin")
+
+            // Manufacturer data
+            if let manufacturerData = map?["darwinManufacturerDataBytes"] as? FlutterStandardTypedData {
+                advertisementData[CBAdvertisementDataManufacturerDataKey] = manufacturerData.data
+            }
+
+            // Service data (dictionary of UUID -> Data)
+            if let serviceDataMap = map?["darwinServiceDataMap"] as? [String: Any] {
+                var cbServiceData: [CBUUID: Data] = [:]
+                for (uuidString, dataValue) in serviceDataMap {
+                    if let data = dataValue as? FlutterStandardTypedData {
+                        cbServiceData[CBUUID(string: uuidString)] = data.data
+                    }
+                }
+                if !cbServiceData.isEmpty {
+                    advertisementData[CBAdvertisementDataServiceDataKey] = cbServiceData
+                }
+            }
+
+            // Overflow service UUIDs
+            if let overflowUuids = map?["darwinoverflowServiceUuids"] as? [String] {
+                advertisementData[CBAdvertisementDataOverflowServiceUUIDsKey] = overflowUuids.map { CBUUID(string: $0) }
+            }
+
+            // Solicited service UUIDs
+            if let solicitedUuids = map?["darwinsolicitedServiceUuids"] as? [String] {
+                advertisementData[CBAdvertisementDataSolicitedServiceUUIDsKey] = solicitedUuids.map { CBUUID(string: $0) }
+            }
+
+            // Is connectable
+            if let isConnectable = map?["darwinisConnectable"] as? Bool {
+                advertisementData[CBAdvertisementDataIsConnectable] = NSNumber(value: isConnectable)
+            }
+
+            print("[flutter_ble_peripheral] Starting advertising with data: \(advertisementData)")
+
+            flutterBlePeripheralManager.startWithAdvertisementData(advertisementData: advertisementData)
             result(nil)
         } else {
             // Return the error state (TurnedOff, Denied, Unsupported, etc.)

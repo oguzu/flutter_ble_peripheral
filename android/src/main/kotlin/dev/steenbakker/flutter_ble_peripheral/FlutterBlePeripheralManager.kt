@@ -72,7 +72,7 @@ class FlutterBlePeripheralManager(
     var mBluetoothManager: BluetoothManager? = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
 
     /** BLE advertiser for broadcasting peripheral data. */
-    var mBluetoothLeAdvertiser: BluetoothLeAdvertiser? = null
+    var mBluetoothLeAdvertiser: BluetoothLeAdvertiser? = mBluetoothManager?.adapter?.bluetoothLeAdvertiser
 
     /** Callback invoked after permission request result */
     var permissionResultCallback: ((FlutterBleBluetoothState) -> Unit)? = null

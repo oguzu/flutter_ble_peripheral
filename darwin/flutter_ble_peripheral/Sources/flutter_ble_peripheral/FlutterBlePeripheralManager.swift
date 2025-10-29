@@ -147,6 +147,29 @@ class FlutterBlePeripheralManager: NSObject {
         }
     }
 
+    /**
+     Starts BLE advertising with a pre-built advertisement data dictionary.
+
+     This method allows for more fine-grained control over advertisement data,
+     including platform-specific settings like manufacturer data, service data, etc.
+
+     - Parameter advertisementData: Complete advertisement data dictionary ready for CBPeripheralManager.
+     */
+    func startWithAdvertisementData(advertisementData: [String: Any]) {
+        print("[flutter_ble_peripheral] Starting advertising with custom data: \(advertisementData)")
+
+        peripheralManager.startAdvertising(advertisementData)
+
+        // Extract service UUID if present to optionally add GATT service
+        if let serviceUuids = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID],
+           let firstUuid = serviceUuids.first,
+           peripheralManager.state == .poweredOn {
+            // Optionally add GATT service for the first advertised UUID
+            // This enables connection support
+            addService(serviceUuid: firstUuid.uuidString)
+        }
+    }
+
     // MARK: - GATT Service Management
 
     /**

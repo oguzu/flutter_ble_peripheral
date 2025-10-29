@@ -12,14 +12,23 @@ import 'package:json_annotation/json_annotation.dart';
 part 'advertise_data.g.dart';
 
 /// Model of the data to be advertised.
+///
+/// **DEPRECATED**: This class mixes Android-specific fields with cross-platform fields.
+/// For new code, use:
+/// - [AdvertiseDataCore] for cross-platform advertising data
+/// - [AndroidAdvertiseData] for Android-specific fields
+/// - [DarwinAdvertiseSettings] for iOS/macOS-specific settings
+/// - [WindowsAdvertiseSettings] for Windows-specific settings
+@Deprecated(
+  'Use AdvertiseDataCore for cross-platform data, or platform-specific classes '
+  '(AndroidAdvertiseData, DarwinAdvertiseSettings, WindowsAdvertiseSettings) '
+  'for platform-specific features. This class will be removed in a future version.',
+)
 @JsonSerializable()
 class AdvertiseData {
   /// Android & iOS
   ///
   /// Specifies a single service UUIDs to be advertised
-  // @Deprecated(
-  //   'Please use serviceUuids, where you can also define a single service uuid.',
-  // )
   final String? serviceUuid;
 
   /// Android & iOS
@@ -64,15 +73,21 @@ class AdvertiseData {
 
   /// Android only
   ///
-  /// set to true if you want to include the power level in the advertisement
+  /// Set to true if you want to include the transmission power level in the advertisement
   /// Default: false
-  final bool? includePowerLevel;
+  ///
+  /// Note: Renamed to match Android native API naming. Previously named `includePowerLevel`.
+  final bool? transmissionPowerIncluded;
 
   /// Android > SDK 31 only
   ///
   /// A service solicitation UUID to advertise data.
   final String? serviceSolicitationUuid;
 
+  @Deprecated(
+    'Use AdvertiseDataCore or AndroidAdvertiseData instead. '
+    'This constructor will be removed in a future version.',
+  )
   AdvertiseData({
     // @Deprecated(
     //   'Please use serviceUuids, where you can also define a single service uuid.',
@@ -85,10 +100,14 @@ class AdvertiseData {
     this.serviceData,
     this.includeDeviceName = false,
     this.localName,
-    this.includePowerLevel = false,
+    this.transmissionPowerIncluded = false,
     this.serviceSolicitationUuid,
   });
 
+  @Deprecated(
+    'Use AdvertiseDataCore.fromJson or AndroidAdvertiseData.fromJson instead. '
+    'This factory will be removed in a future version.',
+  )
   factory AdvertiseData.fromJson(Map<String, dynamic> json) =>
       _$AdvertiseDataFromJson(json);
 

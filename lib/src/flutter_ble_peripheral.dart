@@ -10,12 +10,14 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
-import 'package:flutter_ble_peripheral/src/core/models/advertise_data.dart';
-import 'package:flutter_ble_peripheral/src/platform/android/models/advertise_set_parameters.dart';
-import 'package:flutter_ble_peripheral/src/platform/android/models/advertise_settings.dart';
 import 'package:flutter_ble_peripheral/src/core/enums/flutter_ble_bluetooth_state.dart';
-import 'package:flutter_ble_peripheral/src/platform/android/models/periodic_advertise_settings.dart';
+import 'package:flutter_ble_peripheral/src/core/models/advertise_data.dart';
+import 'package:flutter_ble_peripheral/src/core/models/advertise_data_core.dart';
 import 'package:flutter_ble_peripheral/src/platform/android/enums/flutter_ble_peripheral_state.dart';
+import 'package:flutter_ble_peripheral/src/platform/android/models/android_advertise_data.dart';
+import 'package:flutter_ble_peripheral/src/platform/android/models/android_advertise_settings.dart';
+import 'package:flutter_ble_peripheral/src/platform/darwin/models/darwin_advertise_settings.dart';
+import 'package:flutter_ble_peripheral/src/platform/windows/models/windows_advertise_settings.dart';
 
 class FlutterBlePeripheral {
   /// Singleton instance
@@ -53,53 +55,136 @@ class FlutterBlePeripheral {
   Stream<FlutterBlePeripheralState>? _peripheralState;
   Stream<Uint8List>? _dataReceived;
 
-  /// Start advertising. Takes [AdvertiseData] as an input.
+  /// Start advertising.
+  ///
+  /// [advertiseData] - Core advertising data. Use [AdvertiseDataCore] for cross-platform,
+  /// or platform-specific classes like [AndroidAdvertiseData] for platform features.
+  ///
+  /// Platform-specific settings:
+  /// - Android: [androidSettings]
+  /// - iOS/macOS: [darwinSettings]
+  /// - Windows: [windowsSettings]
+  ///
+  /// For backward compatibility, also accepts legacy [AdvertiseData] (deprecated).
   Future<FlutterBleBluetoothState> start({
-    required AdvertiseData advertiseData,
-    AdvertiseSettings? advertiseSettings,
-    AdvertiseSetParameters? advertiseSetParameters,
-    AdvertiseData? advertiseResponseData,
-    AdvertiseData? advertisePeriodicData,
-    PeriodicAdvertiseSettings? periodicAdvertiseSettings,
+    required AdvertiseDataCore advertiseData,
+
+    // Platform-specific settings
+    AndroidAdvertiseSettings? androidSettings,
+    DarwinAdvertiseSettings? darwinSettings,
+    WindowsAdvertiseSettings? windowsSettings,
   }) async {
     final parameters = advertiseData.toJson();
-    parameters["manufacturerDataBytes"] = advertiseData.manufacturerData;
-    final settings = advertiseSettings ?? AdvertiseSettings();
-    final jsonSettings = settings.toJson();
-    for (final key in jsonSettings.keys) {
-      parameters[key] = jsonSettings[key];
+
+    // Handle Android-specific manufacturer data
+    if (advertiseData is AndroidAdvertiseData) {
+      // Android-specific manufacturer data
+      final androidData = advertiseData as AndroidAdvertiseData;
+      parameters["manufacturerDataBytes"] = androidData.manufacturerData;
+    } else if (advertiseData is AdvertiseData) {
+      // Legacy support for deprecated AdvertiseData
+      final legacyData = advertiseData as AdvertiseData;
+      parameters["manufacturerDataBytes"] = legacyData.manufacturerData;
     }
 
     if (advertiseData.serviceUuids != null) {
       parameters['serviceUuids'] = advertiseData.serviceUuids;
     }
 
-    // ignore: deprecated_member_use_from_same_package
-    // if (advertiseData.serviceUuid == null &&
-    //     advertiseData.serviceUuids != null) {
-    //   try {
-    //     final firstUuid = advertiseData.serviceUuids!.first;
-    //     parameters['serviceUuid'] = firstUuid;
-    //   } catch (e) {
-    //     // no service uuid present
-    //   }
-    // }
-    parameters.addAll(advertiseData.toJson());
+    // Android settings
+    if (Platform.isAndroid && androidSettings != null) {
+      // Automatically set advertiseSet flag based on which parameters are provided
+      final useExtendedAdvertising = androidSettings.advertiseSetParameters != null;
+      parameters['advertiseSet'] = useExtendedAdvertising;
 
-    if (advertiseSetParameters != null) {
-      final json = advertiseSetParameters.toJson();
-      for (final key in json.keys) {
-        parameters['set$key'] = json[key];
+      // Legacy advertising settings
+      if (androidSettings.advertiseSettings != null) {
+        final json = androidSettings.advertiseSettings!.toJson();
+        for (final key in json.keys) {
+          parameters[key] = json[key];
+        }
       }
-      parameters.addAll(advertiseData.toJson());
+
+      // Extended advertising parameters (advertiseSetParameters)
+      if (androidSettings.advertiseSetParameters != null) {
+        final json = androidSettings.advertiseSetParameters!.toJson();
+        for (final key in json.keys) {
+          parameters['set$key'] = json[key];
+        }
+      }
+
+      // Scan response data (advertiseResponseData)
+      if (androidSettings.advertiseResponseData != null) {
+        final responseData = androidSettings.advertiseResponseData!;
+        final json = responseData.toJson();
+        for (final key in json.keys) {
+          parameters['response$key'] = json[key];
+        }
+
+        // Handle manufacturer data bytes separately for response data
+        if (responseData.manufacturerData != null) {
+          parameters['responsemanufacturerDataBytes'] = responseData.manufacturerData;
+        }
+      }
+
+      // Periodic advertising data
+      if (androidSettings.periodicAdvertiseData != null) {
+        final periodicData = androidSettings.periodicAdvertiseData!;
+        final json = periodicData.toJson();
+        for (final key in json.keys) {
+          parameters['periodicData$key'] = json[key];
+        }
+
+        // Handle manufacturer data bytes separately for periodic data
+        if (periodicData.manufacturerData != null) {
+          parameters['periodicDatamanufacturerDataBytes'] = periodicData.manufacturerData;
+        }
+      }
+
+      // Periodic advertising settings
+      if (androidSettings.periodicAdvertiseSettings != null) {
+        final json = androidSettings.periodicAdvertiseSettings!.toJson();
+        for (final key in json.keys) {
+          parameters['periodicsettings$key'] = json[key];
+        }
+      }
     }
 
-    if (advertiseResponseData != null) {
-      final json = advertiseData.toJson();
-      for (final key in json.keys) {
-        parameters['response$key'] = json[key];
+    // Darwin (iOS/macOS) settings
+    if ((Platform.isIOS || Platform.isMacOS) && darwinSettings != null) {
+      final darwinJson = darwinSettings.toJson();
+      for (final key in darwinJson.keys) {
+        parameters['darwin$key'] = darwinJson[key];
       }
-      parameters.addAll(advertiseData.toJson());
+
+      // Convert manufacturer data if present
+      if (darwinSettings.manufacturerData != null) {
+        parameters['darwinManufacturerDataBytes'] =
+            darwinSettings.manufacturerData;
+      }
+
+      // Convert service data dictionary if present
+      if (darwinSettings.serviceData != null) {
+        final serviceDataMap = <String, dynamic>{};
+        darwinSettings.serviceData!.forEach((uuid, data) {
+          serviceDataMap[uuid] = data;
+        });
+        parameters['darwinServiceDataMap'] = serviceDataMap;
+      }
+    }
+
+    // Windows settings
+    if (Platform.isWindows && windowsSettings != null) {
+      final windowsJson = windowsSettings.toJson();
+      for (final key in windowsJson.keys) {
+        parameters['windows$key'] = windowsJson[key];
+      }
+
+      // Convert manufacturer data if present
+      if (windowsSettings.manufacturerData != null) {
+        parameters['windowsManufacturerDataBytes'] =
+            windowsSettings.manufacturerData;
+      }
     }
 
     final response =

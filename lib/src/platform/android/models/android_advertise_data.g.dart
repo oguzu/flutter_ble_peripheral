@@ -1,17 +1,19 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'advertise_data.dart';
+part of 'android_advertise_data.dart';
 
 // **************************************************************************
 // JsonSerializableGenerator
 // **************************************************************************
 
-AdvertiseData _$AdvertiseDataFromJson(Map<String, dynamic> json) =>
-    AdvertiseData(
+AndroidAdvertiseData _$AndroidAdvertiseDataFromJson(
+        Map<String, dynamic> json) =>
+    AndroidAdvertiseData(
       serviceUuid: json['serviceUuid'] as String?,
       serviceUuids: (json['serviceUuids'] as List<dynamic>?)
           ?.map((e) => e as String)
           .toList(),
+      localName: json['localName'] as String?,
       manufacturerId: (json['manufacturerId'] as num?)?.toInt(),
       manufacturerData: const Uint8ListConverter()
           .fromJson(json['manufacturerData'] as List?),
@@ -20,23 +22,23 @@ AdvertiseData _$AdvertiseDataFromJson(Map<String, dynamic> json) =>
           ?.map((e) => (e as num).toInt())
           .toList(),
       includeDeviceName: json['includeDeviceName'] as bool? ?? false,
-      localName: json['localName'] as String?,
       transmissionPowerIncluded:
           json['transmissionPowerIncluded'] as bool? ?? false,
       serviceSolicitationUuid: json['serviceSolicitationUuid'] as String?,
     );
 
-Map<String, dynamic> _$AdvertiseDataToJson(AdvertiseData instance) =>
+Map<String, dynamic> _$AndroidAdvertiseDataToJson(
+        AndroidAdvertiseData instance) =>
     <String, dynamic>{
       'serviceUuid': instance.serviceUuid,
       'serviceUuids': instance.serviceUuids,
+      'localName': instance.localName,
       'manufacturerId': instance.manufacturerId,
       'manufacturerData':
           const Uint8ListConverter().toJson(instance.manufacturerData),
       'serviceDataUuid': instance.serviceDataUuid,
       'serviceData': instance.serviceData,
       'includeDeviceName': instance.includeDeviceName,
-      'localName': instance.localName,
       'transmissionPowerIncluded': instance.transmissionPowerIncluded,
       'serviceSolicitationUuid': instance.serviceSolicitationUuid,
     };

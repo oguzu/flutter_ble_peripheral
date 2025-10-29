@@ -4,7 +4,7 @@
  * BSD-style license that can be found in the LICENSE file.
  */
 
-// ignore: unnecessary_import
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
@@ -27,8 +27,10 @@ class FlutterBlePeripheralExampleState
   String _serviceUuid = 'bf27730d-860a-4e09-889c-2d8b6a9e0fe7';
   String _localName = 'FlutterBLE Peripheral';
 
-  late AdvertiseData _advertiseData;
-  late AdvertiseSettings _advertiseSettings;
+  late AdvertiseDataCore _advertiseData;
+  AndroidAdvertiseSettings? _androidSettings;
+  DarwinAdvertiseSettings? _darwinSettings;
+  WindowsAdvertiseSettings? _windowsSettings;
 
   bool _isSupported = false;
   String _lastReceivedData = 'None';
@@ -80,19 +82,71 @@ class FlutterBlePeripheralExampleState
   }
 
   void _updateAdvertiseData() {
-    _advertiseData = AdvertiseData(
+    // Core advertising data (cross-platform)
+    _advertiseData = AdvertiseDataCore(
       serviceUuid: _serviceUuid,
       localName: _localName,
-      manufacturerId: 1234,
-      // manufacturerData: Uint8List.fromList([1, 2, 3, 4, 5, 6]),
     );
 
-    _advertiseSettings = AdvertiseSettings(
-      advertiseMode: AdvertiseMode.advertiseModeBalanced,
-      txPowerLevel: AdvertiseTxPower.advertiseTxPowerMedium,
-      // timeout: 0, // 0 = no timeout
-      // connectable: true, // IMPORTANT: Enable connections for GATT server
-    );
+    // Platform-specific settings
+    if (Platform.isAndroid) {
+      // Android-specific settings (matches native API structure)
+      _androidSettings = const AndroidAdvertiseSettings(
+        // Extended advertising (Android 8+) - RECOMMENDED
+        // Provides more control and features than legacy advertising
+        advertiseSetParameters: AdvertiseSetParameters(
+          connectable: true, // IMPORTANT: Enable connections for GATT server
+          interval: intervalLow, // 250ms advertising interval
+          txPowerLevel: txPowerHigh, // Maximum range
+          legacyMode: false, // Use extended advertising features
+          // primaryPhy: phy1m, // Optional: 1M PHY (default)
+          // secondaryPhy: phy2m, // Optional: 2M PHY for higher throughput
+        ),
+
+        // Legacy advertising (pre-Android 8) - DEPRECATED
+        // Use only if you need to support Android 7 and below
+        // IMPORTANT: Only use ONE of advertiseSettings OR advertiseSetParameters
+        //
+        // advertiseSettings: AdvertiseSettings(
+        //   connectable: true,
+        //   timeout: 0, // 0 = no timeout
+        //   advertiseMode: AdvertiseMode.advertiseModeLowLatency,
+        //   txPowerLevel: AdvertiseTxPower.advertiseTxPowerHigh,
+        // ),
+
+        // Optional: scan response data
+        // advertiseResponseData: AndroidAdvertiseData(...),
+
+        // Optional: periodic advertising (requires advertiseSetParameters)
+        // periodicAdvertiseData: AndroidAdvertiseData(...),
+        // periodicAdvertiseSettings: PeriodicAdvertiseSettings(...),
+      );
+    } else if (Platform.isIOS || Platform.isMacOS) {
+      // Darwin (iOS/macOS) specific settings
+      _darwinSettings = DarwinAdvertiseSettings(
+        // Example: Add manufacturer data (Apple Inc. = 0x004C)
+        manufacturerData: Uint8List.fromList([
+          0x4C,
+          0x00, // Apple manufacturer ID (little-endian)
+          0x01,
+          0x02,
+          0x03, // Custom data
+        ]),
+        // Example: Add service data
+        serviceData: {
+          "180F": Uint8List.fromList([0x64]), // Battery Service: 100%
+        },
+        // Enable connections
+        isConnectable: true,
+      );
+    } else if (Platform.isWindows) {
+      // Windows-specific settings
+      _windowsSettings = WindowsAdvertiseSettings(
+        manufacturerId: 1234,
+        manufacturerData: Uint8List.fromList([0x01, 0x02, 0x03, 0x04, 0x05]),
+        flags: 0x06, // LE General Discoverable + BR/EDR Not Supported
+      );
+    }
   }
 
   String _formatBytes(Uint8List bytes) {
@@ -153,7 +207,9 @@ class FlutterBlePeripheralExampleState
       _updateAdvertiseData();
       await FlutterBlePeripheral().start(
         advertiseData: _advertiseData,
-        advertiseSettings: _advertiseSettings,
+        androidSettings: _androidSettings,
+        darwinSettings: _darwinSettings,
+        windowsSettings: _windowsSettings,
       );
     }
   }

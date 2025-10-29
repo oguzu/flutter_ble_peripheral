@@ -95,34 +95,121 @@ namespace flutter_ble_peripheral {
         if (method_call.method_name().compare("start") == 0) {
             if (!bluetoothLEPublisher) {
                 bluetoothLEPublisher = BluetoothLEAdvertisementPublisher();
-            } 
+            }
 
             const auto* arguments = std::get_if<EncodableMap>(method_call.arguments());
-            Advertisement::BluetoothLEManufacturerData manufacturerData = Advertisement::BluetoothLEManufacturerData();
             if (arguments) {
-                auto manuDataIt = arguments->find(EncodableValue("manufacturerDataBytes"));
-                if (manuDataIt != arguments->end()) {
+                // Parse core advertising data
+                auto& advertisement = bluetoothLEPublisher.Advertisement();
+
+                // Add service UUID if present
+                auto serviceUuidIt = arguments->find(EncodableValue("serviceUuid"));
+                if (serviceUuidIt != arguments->end()) {
+                    if (auto* serviceUuidStr = std::get_if<std::string>(&serviceUuidIt->second)) {
+                        try {
+                            auto uuid = winrt::guid(*serviceUuidStr);
+                            advertisement.ServiceUuids().Append(uuid);
+                        }
+                        catch (...) {
+                            // Invalid UUID format
+                        }
+                    }
+                }
+
+                // Add multiple service UUIDs if present
+                auto serviceUuidsIt = arguments->find(EncodableValue("serviceUuids"));
+                if (serviceUuidsIt != arguments->end()) {
+                    if (auto* uuidsList = std::get_if<flutter::EncodableList>(&serviceUuidsIt->second)) {
+                        for (const auto& uuidValue : *uuidsList) {
+                            if (auto* uuidStr = std::get_if<std::string>(&uuidValue)) {
+                                try {
+                                    auto uuid = winrt::guid(*uuidStr);
+                                    advertisement.ServiceUuids().Append(uuid);
+                                }
+                                catch (...) {
+                                    // Invalid UUID format
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Set local name if present
+                auto localNameIt = arguments->find(EncodableValue("localName"));
+                if (localNameIt != arguments->end()) {
+                    if (auto* localName = std::get_if<std::string>(&localNameIt->second)) {
+                        advertisement.LocalName(winrt::to_hstring(*localName));
+                    }
+                }
+
+                // Parse Windows-specific settings (prefixed with "windows")
+
+                // Manufacturer data
+                Advertisement::BluetoothLEManufacturerData manufacturerData = Advertisement::BluetoothLEManufacturerData();
+                bool hasManufacturerData = false;
+
+                auto windowsManuDataIt = arguments->find(EncodableValue("windowsManufacturerDataBytes"));
+                if (windowsManuDataIt != arguments->end()) {
                     auto dataWriter = DataWriter();
-                    auto& vector = std::get<std::vector<uint8_t>>(manuDataIt->second);
+                    auto& vector = std::get<std::vector<uint8_t>>(windowsManuDataIt->second);
                     dataWriter.WriteBytes(vector);
                     manufacturerData.Data(dataWriter.DetachBuffer());
+                    hasManufacturerData = true;
                 }
-                auto manuIdIt = arguments->find(EncodableValue("manufacturerId"));
-                if (manuIdIt != arguments->end()) {
-                    auto test = std::get<std::int32_t>(manuIdIt->second);
-                    printf("%ld", test);
-                    //dataWriter2.WriteUInt16(std::get<std::uint16_t>(manuIdIt->second));
-                    manufacturerData.CompanyId(test);
 
-//                    int32_t manuIdInt = std::get<std::int32_t>(manuIdIt->second);
- //                  uint16_t manuId = manuIdInt & 0xFFFF;
-//                    manufacturerData.CompanyId(manuId);
+                auto windowsManuIdIt = arguments->find(EncodableValue("windowsmanufacturerId"));
+                if (windowsManuIdIt != arguments->end()) {
+                    auto manuId = std::get<std::int32_t>(windowsManuIdIt->second);
+                    manufacturerData.CompanyId(static_cast<uint16_t>(manuId));
+                    hasManufacturerData = true;
+                }
+
+                if (hasManufacturerData) {
+                    advertisement.ManufacturerData().Append(manufacturerData);
+                }
+
+                // Advertisement flags
+                auto flagsIt = arguments->find(EncodableValue("windowsflags"));
+                if (flagsIt != arguments->end()) {
+                    if (auto* flags = std::get_if<std::int32_t>(&flagsIt->second)) {
+                        auto flagsData = Advertisement::BluetoothLEAdvertisementFlags(*flags);
+                        advertisement.Flags(flagsData);
+                    }
+                }
+
+                // Use extended advertisement
+                auto useExtendedIt = arguments->find(EncodableValue("windowsuseExtendedAdvertisement"));
+                if (useExtendedIt != arguments->end()) {
+                    if (auto* useExtended = std::get_if<bool>(&useExtendedIt->second)) {
+                        if (*useExtended) {
+                            // Enable extended advertisement format
+                            bluetoothLEPublisher.UseExtendedAdvertisement(true);
+                        }
+                    }
+                }
+
+                // Preferred transmit power level
+                auto txPowerIt = arguments->find(EncodableValue("windowspreferredTransmitPowerLevel"));
+                if (txPowerIt != arguments->end()) {
+                    if (auto* txPower = std::get_if<std::int32_t>(&txPowerIt->second)) {
+                        auto powerLevel = static_cast<int16_t>(*txPower);
+                        bluetoothLEPublisher.PreferredTransmitPowerLevelInDBm(powerLevel);
+                    }
+                }
+
+                // Include TX power
+                auto includeTxPowerIt = arguments->find(EncodableValue("windowsincludeTxPower"));
+                if (includeTxPowerIt != arguments->end()) {
+                    if (auto* includeTxPower = std::get_if<bool>(&includeTxPowerIt->second)) {
+                        if (*includeTxPower) {
+                            // Windows API: This is typically controlled via flags
+                            // The TX power level advertisement is automatic in some scenarios
+                        }
+                    }
                 }
             }
 
-            bluetoothLEPublisher.Advertisement().ManufacturerData().Append(manufacturerData);
             bluetoothLEPublisher.Start();
-
             result->Success(8);
         }
         else if (method_call.method_name().compare("stop") == 0) {
