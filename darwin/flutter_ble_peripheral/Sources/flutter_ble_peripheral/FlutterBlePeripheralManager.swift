@@ -53,6 +53,9 @@ class FlutterBlePeripheralManager: NSObject {
     /// The receive (RX) characteristic for receiving data from centrals.
     var rxCharacteristic: CBMutableCharacteristic?
 
+    /// Pending service UUID to add when peripheral manager powers on.
+    var pendingServiceUuid: String?
+
     // MARK: - Connection Tracking
 
     /// Set of UUIDs representing centrals subscribed to the TX characteristic.
@@ -160,13 +163,17 @@ class FlutterBlePeripheralManager: NSObject {
 
         peripheralManager.startAdvertising(advertisementData)
 
-        // Extract service UUID if present to optionally add GATT service
+        // Extract service UUID if present to add GATT service
         if let serviceUuids = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID],
-           let firstUuid = serviceUuids.first,
-           peripheralManager.state == .poweredOn {
-            // Optionally add GATT service for the first advertised UUID
-            // This enables connection support
-            addService(serviceUuid: firstUuid.uuidString)
+           let firstUuid = serviceUuids.first {
+            if peripheralManager.state == .poweredOn {
+                // Add GATT service immediately if powered on
+                addService(serviceUuid: firstUuid.uuidString)
+            } else {
+                // Store service UUID to add when powered on
+                pendingServiceUuid = firstUuid.uuidString
+                print("[flutter_ble_peripheral] Peripheral manager not powered on yet, will add service when ready")
+            }
         }
     }
 
@@ -224,19 +231,22 @@ class FlutterBlePeripheralManager: NSObject {
      - Returns: A derived UUID string for the characteristic.
      */
     private func generateCharacteristicUuid(serviceUuid: String, type: String) -> String {
-        let uuid = UUID(uuidString: serviceUuid) ?? UUID()
-        let hashValue = type.hashValue
-        var uuidString = uuid.uuidString
+        guard let base = UUID(uuidString: serviceUuid) else { return UUID().uuidString }
 
-        // Modify the last UUID component for uniqueness
-        let components = uuidString.components(separatedBy: "-")
-        if components.count == 5 {
-            let lastComponent = components[4]
-            let modified = String(format: "%08X", Int(lastComponent, radix: 16)! ^ hashValue)
-            uuidString = "\(components[0])-\(components[1])-\(components[2])-\(components[3])-\(modified)"
-        }
-        return uuidString
+        let hash = abs(type.hashValue) & 0xFFFFFFFF // stable 32-bit portion
+
+        var parts = base.uuidString.split(separator: "-").map(String.init)
+        guard parts.count == 5 else { return base.uuidString }
+
+        let last = parts[4]
+        let prefix = String(last.prefix(last.count - 8)) // keep front section
+        let suffix = String(format: "%08X", hash)
+
+        parts[4] = prefix + suffix // reconstruct valid 12-hex tail
+
+        return parts.joined(separator: "-")
     }
+
 
     // MARK: - Data Transmission
 
@@ -284,6 +294,7 @@ class FlutterBlePeripheralManager: NSObject {
         txSubscriptions.removeAll()
         connectedCentrals.removeAll()
         txSubscribed = false
+        pendingServiceUuid = nil
 
         print("[flutter_ble_peripheral] Stopped advertising and removed services")
     }

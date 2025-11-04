@@ -6,6 +6,7 @@ import FlutterMacOS
 import AppKit
 #endif
 import CoreLocation
+import CoreBluetooth
 
 /**
  The `FlutterBlePeripheralPlugin` class is the main entry point for the
@@ -175,22 +176,22 @@ public class FlutterBlePeripheralPlugin: NSObject, FlutterPlugin {
             // Parse Darwin-specific settings (prefixed with "darwin")
 
             // Manufacturer data
-            if let manufacturerData = map?["darwinManufacturerDataBytes"] as? FlutterStandardTypedData {
-                advertisementData[CBAdvertisementDataManufacturerDataKey] = manufacturerData.data
-            }
+//            if let manufacturerData = map?["darwinManufacturerDataBytes"] as? FlutterStandardTypedData {
+//                advertisementData[CBAdvertisementDataManufacturerDataKey] = manufacturerData.data
+//            }
 
             // Service data (dictionary of UUID -> Data)
-            if let serviceDataMap = map?["darwinServiceDataMap"] as? [String: Any] {
-                var cbServiceData: [CBUUID: Data] = [:]
-                for (uuidString, dataValue) in serviceDataMap {
-                    if let data = dataValue as? FlutterStandardTypedData {
-                        cbServiceData[CBUUID(string: uuidString)] = data.data
-                    }
-                }
-                if !cbServiceData.isEmpty {
-                    advertisementData[CBAdvertisementDataServiceDataKey] = cbServiceData
-                }
-            }
+//            if let serviceDataMap = map?["darwinServiceDataMap"] as? [String: Any] {
+//                var cbServiceData: [CBUUID: Data] = [:]
+//                for (uuidString, dataValue) in serviceDataMap {
+//                    if let data = dataValue as? FlutterStandardTypedData {
+//                        cbServiceData[CBUUID(string: uuidString)] = data.data
+//                    }
+//                }
+//                if !cbServiceData.isEmpty {
+//                    advertisementData[CBAdvertisementDataServiceDataKey] = cbServiceData
+//                }
+//            }
 
             // Overflow service UUIDs
             if let overflowUuids = map?["darwinoverflowServiceUuids"] as? [String] {
@@ -203,9 +204,9 @@ public class FlutterBlePeripheralPlugin: NSObject, FlutterPlugin {
             }
 
             // Is connectable
-            if let isConnectable = map?["darwinisConnectable"] as? Bool {
-                advertisementData[CBAdvertisementDataIsConnectable] = NSNumber(value: isConnectable)
-            }
+//            if let isConnectable = map?["darwinisConnectable"] as? Bool {
+//                advertisementData[CBAdvertisementDataIsConnectable] = NSNumber(value: isConnectable)
+//            }
 
             print("[flutter_ble_peripheral] Starting advertising with data: \(advertisementData)")
 

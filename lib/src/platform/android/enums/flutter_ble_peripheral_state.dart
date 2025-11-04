@@ -18,7 +18,7 @@ enum FlutterBlePeripheralState {
   poweredOff,
 
   // /// Android only: Location services are disabled.
-  // locationServicesDisabled,
+  locationServicesDisabled,
 
   /// BLE is fully operating for this app.
   idle,

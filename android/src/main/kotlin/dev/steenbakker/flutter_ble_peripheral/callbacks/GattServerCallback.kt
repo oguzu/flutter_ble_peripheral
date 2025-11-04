@@ -33,20 +33,42 @@ class GattServerCallback(
     override fun onConnectionStateChange(device: BluetoothDevice?, status: Int, newState: Int) {
         super.onConnectionStateChange(device, status, newState)
 
-        device?.let {
-            when (newState) {
-                BluetoothProfile.STATE_CONNECTED -> {
-                    Log.i(tag, "Device connected: ${device.address}")
-                    connectedDevices.add(device)
-                    flutterBlePeripheralStateChangedHandler.publish(FlutterBlePeripheralState.connected)
+        Log.i(tag, "onConnectionStateChange: device=${device?.address}, status=$status, newState=$newState")
+
+        // Only process if device is not null and status indicates success
+        if (device == null) {
+            Log.w(tag, "onConnectionStateChange called with null device")
+            return
+        }
+
+        // Status 0 = SUCCESS (GATT_SUCCESS)
+        // Only transition states on successful status
+        if (status != BluetoothGatt.GATT_SUCCESS) {
+            Log.w(tag, "onConnectionStateChange with non-success status: $status for device ${device.address}")
+            return
+        }
+
+        when (newState) {
+            BluetoothProfile.STATE_CONNECTED -> {
+                Log.i(tag, "Device connected: ${device.address} (status: $status)")
+                connectedDevices.add(device)
+                flutterBlePeripheralStateChangedHandler.publish(FlutterBlePeripheralState.connected)
+            }
+            BluetoothProfile.STATE_DISCONNECTED -> {
+                Log.i(tag, "Device disconnected: ${device.address} (status: $status)")
+                connectedDevices.remove(device)
+                if (connectedDevices.isEmpty()) {
+                    flutterBlePeripheralStateChangedHandler.publish(FlutterBlePeripheralState.advertising)
                 }
-                BluetoothProfile.STATE_DISCONNECTED -> {
-                    Log.i(tag, "Device disconnected: ${device.address}")
-                    connectedDevices.remove(device)
-                    if (connectedDevices.isEmpty()) {
-                        flutterBlePeripheralStateChangedHandler.publish(FlutterBlePeripheralState.advertising)
-                    }
-                }
+            }
+            BluetoothProfile.STATE_CONNECTING -> {
+                Log.i(tag, "Device connecting: ${device.address}")
+            }
+            BluetoothProfile.STATE_DISCONNECTING -> {
+                Log.i(tag, "Device disconnecting: ${device.address}")
+            }
+            else -> {
+                Log.w(tag, "Unknown connection state: $newState for device ${device.address}")
             }
         }
     }

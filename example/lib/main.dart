@@ -36,6 +36,7 @@ class FlutterBlePeripheralExampleState
   String _lastReceivedData = 'None';
   int _currentMtu = 23; // Default MTU
   int _messageCounter = 0;
+  int _receivedMessageCounter = 0;
 
   final _serviceUuidController = TextEditingController();
   final _localNameController = TextEditingController();
@@ -55,11 +56,26 @@ class FlutterBlePeripheralExampleState
 
     // Listen to data received
     FlutterBlePeripheral().onDataReceived.listen((data) {
-      setState(() {
-        _lastReceivedData = 'Bytes: ${data.length}, Data: ${_formatBytes(data)}';
-      });
-      if (kDebugMode) {
-        print('Received data: $data');
+      if (data.isNotEmpty) {
+        _receivedMessageCounter++;
+        final dataStr = String.fromCharCodes(data);
+        setState(() {
+          _lastReceivedData = 'Message #$_receivedMessageCounter\nText: $dataStr\nBytes: ${data.length}\nHex: ${_formatBytes(data)}';
+        });
+        if (kDebugMode) {
+          print('Received data: $data');
+        }
+
+        // Show snackbar notification
+        _messangerKey.currentState
+          ?..clearSnackBars()
+          ..showSnackBar(
+            SnackBar(
+              content: Text('Received: $dataStr'),
+              backgroundColor: Colors.blue,
+              duration: const Duration(seconds: 2),
+            ),
+          );
       }
     });
 
@@ -83,9 +99,10 @@ class FlutterBlePeripheralExampleState
 
   void _updateAdvertiseData() {
     // Core advertising data (cross-platform)
-    _advertiseData = AdvertiseDataCore(
+    _advertiseData = AndroidAdvertiseData(
       serviceUuid: _serviceUuid,
       localName: _localName,
+      includeDeviceName: true,
     );
 
     // Platform-specific settings
@@ -95,6 +112,7 @@ class FlutterBlePeripheralExampleState
         // Extended advertising (Android 8+) - RECOMMENDED
         // Provides more control and features than legacy advertising
         advertiseSetParameters: AdvertiseSetParameters(
+          // scannable: true,
           connectable: true, // IMPORTANT: Enable connections for GATT server
           interval: intervalLow, // 250ms advertising interval
           txPowerLevel: txPowerHigh, // Maximum range
@@ -430,18 +448,67 @@ class FlutterBlePeripheralExampleState
                       ),
                       const SizedBox(height: 8),
                       Text('MTU: $_currentMtu bytes'),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Last received:',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      SelectableText(
-                        _lastReceivedData,
-                        style: const TextStyle(fontSize: 12),
-                      ),
                     ],
                   ),
                 ),
+              ),
+              const SizedBox(height: 16),
+              StreamBuilder(
+                stream: FlutterBlePeripheral().onPeripheralStateChanged,
+                initialData: FlutterBlePeripheralState.unknown,
+                builder: (BuildContext context, AsyncSnapshot<FlutterBlePeripheralState> snapshot) {
+                  final isConnected = snapshot.data == FlutterBlePeripheralState.connected;
+                  if (!isConnected) return const SizedBox.shrink();
+                  return Card(
+                    // color: isConnected ? Colors.blue.shade50 : null,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Text(
+                                'Received Data',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
+                              const SizedBox(width: 8),
+                              if (isConnected)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Text(
+                                    'CONNECTED',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: SelectableText(
+                              _lastReceivedData,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 16),
               StreamBuilder(

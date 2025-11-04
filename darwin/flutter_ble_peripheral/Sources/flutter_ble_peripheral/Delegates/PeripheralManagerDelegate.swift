@@ -16,7 +16,12 @@ extension FlutterBlePeripheralManager: CBPeripheralManagerDelegate {
         switch peripheral.state {
         case .poweredOn:
             state = .idle
-//            addService() TODO: add service
+            // Add pending GATT service if advertising was started before powered on
+            if let serviceUuid = pendingServiceUuid {
+                print("[flutter_ble_peripheral] Peripheral powered on, adding pending service: \(serviceUuid)")
+                addService(serviceUuid: serviceUuid)
+                pendingServiceUuid = nil
+            }
         case .poweredOff:
             state = .poweredOff
         case .resetting:

@@ -38,7 +38,7 @@ class AdvertiseDataCore {
   ///
   /// Platform-specific behavior:
   /// - iOS/macOS: Sets CBAdvertisementDataLocalNameKey (max 10 bytes recommended)
-  /// - Android: Use [AndroidAdvertiseData.includeDeviceName] instead
+  /// - Android: Does not work, use [AndroidAdvertiseData.includeDeviceName] instead
   /// - Windows: Sets the local name in advertisement
   final String? localName;
 

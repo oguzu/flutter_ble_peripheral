@@ -26,6 +26,9 @@ enum FlutterBlePeripheralState: Int {
 
     /// Bluetooth is currently turned off.
     case poweredOff
+    
+    /// Android only: Location services are disabled.
+    case locationServicesDisabled
 
     /// BLE is available and ready to use, but not currently advertising or connected.
     case idle
