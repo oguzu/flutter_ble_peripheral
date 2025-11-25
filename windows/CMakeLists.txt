@@ -26,6 +26,11 @@ exec_program(${NUGET_EXE}
 list(APPEND PLUGIN_SOURCES
   "flutter_ble_peripheral_plugin.cpp"
   "flutter_ble_peripheral_plugin.h"
+  "handlers/state_changed_handler.cpp"
+  "handlers/state_changed_handler.h"
+  "manager/flutter_ble_peripheral_manager.cpp"
+  "manager/flutter_ble_peripheral_manager.h"
+  "models/peripheral_state.h"
 )
 
 # Define the plugin library target. Its name must not be changed (see comment
