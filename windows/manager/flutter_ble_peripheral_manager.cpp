@@ -151,8 +151,13 @@ namespace manager {
             auto company_id = std::get<int32_t>(manu_id_it->second);
             manufacturer_data.CompanyId(static_cast<uint16_t>(company_id));
 
-            // Set data
-            auto data_vector = std::get<std::vector<uint8_t>>(manu_data_it->second);
+            // Set data - convert EncodableList to std::vector<uint8_t>
+            auto data_list = std::get<flutter::EncodableList>(manu_data_it->second);
+            std::vector<uint8_t> data_vector;
+            data_vector.reserve(data_list.size());
+            for (const auto& byte_value : data_list) {
+                data_vector.push_back(static_cast<uint8_t>(std::get<int32_t>(byte_value)));
+            }
             DataWriter data_writer;
             data_writer.WriteBytes(data_vector);
             manufacturer_data.Data(data_writer.DetachBuffer());
@@ -193,7 +198,13 @@ namespace manager {
         auto service_data_it = arguments.find(EncodableValue("serviceData"));
         auto service_data_uuid_it = arguments.find(EncodableValue("serviceDataUuid"));
         if (service_data_it != arguments.end() && service_data_uuid_it != arguments.end()) {
-            auto data_vector = std::get<std::vector<uint8_t>>(service_data_it->second);
+            // Convert EncodableList to std::vector<uint8_t>
+            auto data_list = std::get<flutter::EncodableList>(service_data_it->second);
+            std::vector<uint8_t> data_vector;
+            data_vector.reserve(data_list.size());
+            for (const auto& byte_value : data_list) {
+                data_vector.push_back(static_cast<uint8_t>(std::get<int32_t>(byte_value)));
+            }
             auto uuid_string = std::get<std::string>(service_data_uuid_it->second);
 
             try {

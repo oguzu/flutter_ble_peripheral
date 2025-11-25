@@ -27,12 +27,12 @@ namespace flutter_ble_peripheral {
         FlutterBlePeripheralPlugin(const FlutterBlePeripheralPlugin&) = delete;
         FlutterBlePeripheralPlugin& operator=(const FlutterBlePeripheralPlugin&) = delete;
 
-    private:
         // Called when a method is called on this plugin's channel from Dart.
         void HandleMethodCall(
             const flutter::MethodCall<flutter::EncodableValue>& method_call,
             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
 
+    private:
         std::unique_ptr<handlers::StateChangedHandler> state_changed_handler_;
         std::unique_ptr<manager::FlutterBlePeripheralManager> peripheral_manager_;
     };
